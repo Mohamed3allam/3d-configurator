@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { styled } from "styled-components";
 import * as THREE from "three";
 import { Vector3 } from "three";
@@ -9,57 +9,68 @@ const Input = styled.input`
     border-radius: 10px;
 `;
 
-const Controls = ({
-    tShirtColor1,
-    setTShirtColor1,
-    tShirtColor2,
-    setTShirtColor2,
-    text,
-    setText,
-    handleAddText,
-    handleAddImage,
-    elements,
-    setElements,
-}) => {
+const FrontControls = ({ elements, setElements }) => {
+    const [text, setText] = useState("");
+    const [textColor, setTextColor] = useState("#000");
+
     const handleElementChange = (index, key, value) => {
         const newElements = [...elements];
         newElements[index][key] = value;
         setElements(newElements);
     };
 
+    const handleAddText = () => {
+        if (text.trim() === "") {
+            return;
+        }
+        setElements((prev) => [
+            ...prev,
+            {
+                type: "text",
+                color: textColor,
+                content: text.trim(),
+                position: new THREE.Vector3(0, 0, 0),
+                scale: new THREE.Vector3(1, 1, 1),
+                size: 18,
+            },
+        ]);
+        setText("");
+    };
+
+    const handleAddImage = (event) => {
+        const file = event.target.files[0];
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const textureLoader = new THREE.TextureLoader();
+            textureLoader.load(
+                e.target.result,
+                (texture) => {
+                    if (texture) {
+                        texture.repeat.set(1, 1); // Set texture to show only once
+                        setElements((prev) => [
+                            ...prev,
+                            {
+                                type: "image",
+                                texture,
+                                position: new THREE.Vector3(0, 0, 0),
+                                scale: new THREE.Vector3(1, 1, 1),
+                            },
+                        ]);
+                    } else {
+                        console.error("Failed to load texture.");
+                    }
+                },
+                undefined,
+                (error) => {
+                    console.error("Error loading texture:", error);
+                }
+            );
+        };
+        reader.readAsDataURL(file);
+    };
+
     return (
         <div className="flex flex-col gap-4 flex-1">
-            <div className="flex flex-col justify-center">
-                <h1 className="text-2xl font-semibold">T-Shirt Colors</h1>
-                <div className="flex gap-3">
-                    <div>
-                        <label className="flex gap-3 items-center">
-                            Color 1
-                            <Input
-                                type="color"
-                                value={tShirtColor1}
-                                onChange={(e) =>
-                                    setTShirtColor1(e.target.value)
-                                }
-                            />
-                        </label>
-                    </div>
-                    <div>
-                        <label className="flex gap-3 items-center">
-                            Color 2
-                            <Input
-                                type="color"
-                                value={tShirtColor2}
-                                onChange={(e) =>
-                                    setTShirtColor2(e.target.value)
-                                }
-                            />
-                        </label>
-                    </div>
-                </div>
-            </div>
-            <SidewayChoice />
-
             <div>
                 <label htmlFor="">
                     <input
@@ -187,4 +198,4 @@ const Controls = ({
     );
 };
 
-export default Controls;
+export default FrontControls;

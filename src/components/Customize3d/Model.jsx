@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useGLTF } from "@react-three/drei";
-import { useThree } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { DecalGeometry } from "three/examples/jsm/geometries/DecalGeometry";
 
@@ -17,36 +17,63 @@ const createTextTexture = (text, color, fontSize = 64) => {
     return new THREE.CanvasTexture(canvas);
 };
 
-const Model = ({ tShirtColor1, tShirtColor2, elements }) => {
-    // const { scene, cameras } = useGLTF("/human-tshirt-pants.glb");
-    //IMPORTING IMAGES
-    function importAll(r) {
-        let images = {};
-        r.keys().forEach((item, index) => {
-            images[item.replace("./", "")] = r(item);
-        });
-        return images;
-    }
-    const model = importAll(
-        require.context("./model", true, /\.(glb)$/)
-    );
-    const { scene, cameras } = useGLTF(model["human-tshirt-pants.glb"]);
-    const { camera } = useThree();
-    const decalMeshRef = useRef(new THREE.Group());
+const cameraPositions = {
+    front: new THREE.Vector3(0, 0, 3),
+    back: new THREE.Vector3(0, 0, -3),
+    right: new THREE.Vector3(2, 1, -0.1), // Closer to the model
+    left: new THREE.Vector3(-2, 1, -0.1), // Closer to the model
+};
 
+//IMPORTING IMAGES
+function importAll(r) {
+    let images = {};
+    r.keys().forEach((item, index) => {
+        images[item.replace("./", "")] = r(item);
+    });
+    return images;
+}
+
+const Model = ({
+    side,
+    tShirtColor1,
+    tShirtColor2,
+    frontElements,
+    backElements,
+    leftElements,
+    rightElements,
+}) => {
+    const model = importAll(require.context("./model", true, /\.(glb)$/));
+    const { scene, cameras } = useGLTF(model["polo_white_tshirt.glb"]);
+    const { camera } = useThree();
+    const [targetPosition, setTargetPosition] = useState(
+        camera.position.clone()
+    );
+    const [positionChanged, setPositionChanged] = useState(false);
+
+    const frontDecalMeshRef = useRef(new THREE.Group());
+    const backDecalMeshRef = useRef(new THREE.Group());
+    const leftDecalMeshRef = useRef(new THREE.Group());
+    const rightDecalMeshRef = useRef(new THREE.Group());
+
+    // T-SHIRT COLORS CONTROLLING
     useEffect(() => {
         scene.traverse((child) => {
             if (child.isMesh) {
-                console.log(child)
                 if (
-                    child.name.includes("Tshirt_and_Jeans_2") ||
-                    child.name.includes("Tshirt_and_Jeans_3")
+                    child.name === "polySurface37_re_work_phong1__0" ||
+                    child.name === "polySurface3_re_work_phong1__0" ||
+                    child.name === "polySurface38_re_work_phong1__0"
                 ) {
                     child.material = new THREE.MeshStandardMaterial({
                         color: tShirtColor2,
                     });
                 }
-                if (child.name.includes("Tshirt_and_Jeans_4")) {
+                if (
+                    child.name === "ShirtpolySurface36_re_work_phong1__0" ||
+                    child.name === "ShirtpolySurface38_re_work_phong1__0" ||
+                    child.name === "ShirtpolySurface39_re_work_phong1__0" ||
+                    child.name === "polySurface4_re_work_phong1__0"
+                ) {
                     child.material = new THREE.MeshStandardMaterial({
                         color: tShirtColor1,
                     });
@@ -56,12 +83,14 @@ const Model = ({ tShirtColor1, tShirtColor2, elements }) => {
         });
     }, [tShirtColor1, tShirtColor2, scene]);
 
-    const updateElements = () => {
+    // FRONT SIDE ELEMENTS CONTROL
+    const updateFrontElements = () => {
         scene.traverse((child) => {
-            if (child.isMesh && child.name.includes("Tshirt_and_Jeans_4")) {
-                elements.forEach((element, index) => {
-                    console.log(`Processing element ${index}:`, element);
-
+            if (
+                child.isMesh &&
+                child.name.includes("ShirtpolySurface36_re_work_phong1__0")
+            ) {
+                frontElements.forEach((element, index) => {
                     const texture =
                         element.type === "image"
                             ? element.texture
@@ -72,14 +101,8 @@ const Model = ({ tShirtColor1, tShirtColor2, elements }) => {
                               );
 
                     if (texture) {
-                        console.log(
-                            `Creating decal material for element ${index}`
-                        );
                         // Ensure texture does not repeat
                         texture.repeat.set(1, 1); // Set texture to show only once
-                        texture.wrapS = THREE.ClampToEdgeWrapping; // clamp the texture to the edge along the s-axis
-                        texture.wrapT = THREE.ClampToEdgeWrapping; // clamp the texture to the edge along the t-axis
-                        console.log(texture);
                         const decalMaterial = new THREE.MeshBasicMaterial({
                             map: texture,
                             transparent: true,
@@ -87,7 +110,6 @@ const Model = ({ tShirtColor1, tShirtColor2, elements }) => {
                             depthWrite: true,
                             polygonOffset: true,
                             polygonOffsetFactor: -1,
-                            side: THREE.FrontSide, // Ensure decals only show on front side
                         });
 
                         const position = new THREE.Vector3(
@@ -101,12 +123,12 @@ const Model = ({ tShirtColor1, tShirtColor2, elements }) => {
 
                         const size = new THREE.Vector3(
                             element.type === "text"
-                                ? element.scale.x * 30
-                                : element.scale.x * 10,
+                                ? element.scale.x
+                                : element.scale.x,
                             element.type === "text"
-                                ? element.scale.y * 30
-                                : element.scale.y * 10,
-                            element.scale.z * 20
+                                ? element.scale.y
+                                : element.scale.y,
+                            element.scale.z * 1
                         );
 
                         const decalGeometry = new DecalGeometry(
@@ -120,7 +142,7 @@ const Model = ({ tShirtColor1, tShirtColor2, elements }) => {
                             decalGeometry,
                             decalMaterial
                         );
-                        decalMeshRef.current.add(decalMesh);
+                        frontDecalMeshRef.current.add(decalMesh);
                         decalMesh.material.needsUpdate = true;
                     } else {
                         console.error(
@@ -131,16 +153,101 @@ const Model = ({ tShirtColor1, tShirtColor2, elements }) => {
             }
         });
     };
-
     useEffect(() => {
-        if (decalMeshRef.current) {
-            while (decalMeshRef.current.children.length) {
-                decalMeshRef.current.remove(decalMeshRef.current.children[0]);
+        if (frontDecalMeshRef.current) {
+            while (frontDecalMeshRef.current.children.length) {
+                frontDecalMeshRef.current.remove(
+                    frontDecalMeshRef.current.children[0]
+                );
             }
         }
-        updateElements();
-    }, [elements]);
+        updateFrontElements();
+    }, [frontElements]);
 
+    // BACK SIDE ELEMENTS CONTROL
+    const updateBackElements = () => {
+        scene.traverse((child) => {
+            if (
+                child.isMesh &&
+                child.name.includes("polySurface4_re_work_phong1__0")
+            ) {
+                backElements.forEach((element, index) => {
+                    const texture =
+                        element.type === "image"
+                            ? element.texture
+                            : createTextTexture(
+                                  element.content,
+                                  element.color,
+                                  element.size
+                              );
+
+                    if (texture) {
+                        // Ensure texture does not repeat
+                        texture.repeat.set(1, 1); // Set texture to show only once
+                        texture.transparent = true
+                        const decalMaterial = new THREE.MeshBasicMaterial({
+                            map: texture,
+                            transparent: true,
+                            depthTest: true,
+                            depthWrite: true,
+                            polygonOffset: true,
+                            polygonOffsetFactor: -1,
+                        });
+
+                        const position = new THREE.Vector3(
+                            element.position.x,
+                            element.position.y,
+                            element.position.z * 1
+                        );
+
+                        // Orientation must be correctly aligned to the surface normal
+                        const orientation = new THREE.Euler(0, Math.PI, 0);
+
+                        const size = new THREE.Vector3(
+                            element.type === "text"
+                                ? element.scale.x
+                                : element.scale.x,
+                            element.type === "text"
+                                ? element.scale.y
+                                : element.scale.y,
+                            element.scale.z * 1
+                        );
+
+                        const decalGeometry = new DecalGeometry(
+                            child,
+                            position,
+                            orientation,
+                            size
+                        );
+                        
+
+                        const decalMesh = new THREE.Mesh(
+                            decalGeometry,
+                            decalMaterial
+                        );
+                        backDecalMeshRef.current.add(decalMesh);
+                        decalMesh.material.needsUpdate = true;
+                    } else {
+                        console.error(
+                            `Texture is undefined for element ${index}`
+                        );
+                    }
+                });
+            }
+        });
+    };
+    useEffect(() => {
+        if (backDecalMeshRef.current) {
+            while (backDecalMeshRef.current.children.length) {
+                backDecalMeshRef.current.remove(
+                    backDecalMeshRef.current.children[0]
+                );
+            }
+        }
+        updateBackElements();
+    }, [backElements]);
+
+    // CAMERA CONTROLLING
     useEffect(() => {
         if (cameras && cameras.length > 0) {
             const gltfCamera = cameras[0];
@@ -150,12 +257,29 @@ const Model = ({ tShirtColor1, tShirtColor2, elements }) => {
             camera.updateProjectionMatrix();
         }
     }, [cameras, camera]);
+    useFrame(() => {
+        if (positionChanged && targetPosition) {
+            camera.position.lerp(targetPosition, 0.05);
+            camera.lookAt(0, 0, 0);
+            camera.updateProjectionMatrix();
+        }
+    });
+    useEffect(() => {
+        if (side) {
+            setTargetPosition(cameraPositions[side] || camera.position.clone());
+            setPositionChanged(true);
+        }
+    }, [side]);
+
 
     return (
         <>
-            <primitive object={scene}>
-                <group ref={decalMeshRef} />
-            </primitive>
+                <primitive object={scene}>
+                    <group ref={frontDecalMeshRef} />
+                    <group ref={backDecalMeshRef} />
+                    <group ref={leftDecalMeshRef} />
+                    <group ref={rightDecalMeshRef} />
+                </primitive>
         </>
     );
 };
